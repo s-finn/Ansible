@@ -1,7 +1,243 @@
 - hosts: all
   become: yes
+  gather_facts: yes
+
+  vars:
+    landing_page_html: |
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <title>Tines + Terraform + Ansible</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          body {
+            min-height: 100vh;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text",
+              "Segoe UI", sans-serif;
+            color: #f9fafb;
+            background: radial-gradient(circle at top left, #5e5df0 0, #111827 45%, #020617 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+          }
+          .shell {
+            max-width: 900px;
+            width: 100%;
+            background: rgba(15, 23, 42, 0.92);
+            border-radius: 24px;
+            border: 1px solid rgba(148, 163, 184, 0.4);
+            box-shadow:
+              0 18px 45px rgba(15, 23, 42, 0.8),
+              0 0 0 1px rgba(15, 23, 42, 0.8);
+            overflow: hidden;
+          }
+          .shell-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.85rem 1.3rem;
+            background: radial-gradient(circle at top left, #6366f1, #111827);
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+          }
+          .shell-dots {
+            display: flex;
+            gap: 0.35rem;
+          }
+          .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: #f97373;
+          }
+          .dot:nth-child(2) { background: #facc15; }
+          .dot:nth-child(3) { background: #4ade80; }
+          .shell-title {
+            font-size: 0.8rem;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: rgba(249, 250, 251, 0.82);
+          }
+          .shell-body {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+            gap: 2rem;
+            padding: 2.25rem 2.5rem 2.3rem;
+          }
+          @media (max-width: 800px) {
+            .shell-body {
+              grid-template-columns: minmax(0, 1fr);
+              padding: 1.8rem 1.5rem 1.9rem;
+            }
+          }
+          .headline {
+            font-size: 2rem;
+            line-height: 1.15;
+            font-weight: 700;
+            letter-spacing: -.03em;
+            margin-bottom: 0.75rem;
+          }
+          .headline span {
+            color: #a5b4fc;
+          }
+          .subheadline {
+            color: #9ca3af;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-bottom: 1.6rem;
+          }
+          .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            border-radius: 999px;
+            padding: 0.22rem 0.7rem 0.22rem 0.25rem;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(148, 163, 184, 0.55);
+            color: #e5e7eb;
+            margin-bottom: 0.9rem;
+          }
+          .pill-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            background: #4ade80;
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
+          }
+          .badge-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.35rem;
+            margin-bottom: 1.8rem;
+          }
+          .badge {
+            font-size: 0.75rem;
+            color: #e5e7eb;
+            background: rgba(30, 64, 175, 0.35);
+            border-radius: 999px;
+            padding: 0.22rem 0.7rem;
+            border: 1px solid rgba(129, 140, 248, 0.5);
+          }
+          .cta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+          }
+          .btn-primary {
+            border-radius: 999px;
+            border: none;
+            padding: 0.6rem 1.4rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            letter-spacing: .02em;
+            background: linear-gradient(135deg, #6366f1, #4f46e5);
+            color: white;
+            cursor: default;
+            box-shadow:
+              0 12px 25px rgba(79, 70, 229, 0.6),
+              0 0 0 1px rgba(129, 140, 248, 0.7);
+          }
+          .hint {
+            font-size: 0.8rem;
+            color: #9ca3af;
+          }
+          .hint code {
+            background: rgba(15, 23, 42, 0.8);
+            padding: 0.15rem 0.35rem;
+            border-radius: 4px;
+            border: 1px solid rgba(55, 65, 81, 0.9);
+            font-size: 0.8rem;
+          }
+          .side-panel {
+            background: radial-gradient(circle at top, rgba(129, 140, 248, 0.16), rgba(15, 23, 42, 0.95));
+            border-radius: 16px;
+            border: 1px solid rgba(55, 65, 81, 0.9);
+            padding: 1.4rem 1.3rem;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.78rem;
+            color: #e5e7eb;
+            display: flex;
+            flex-direction: column;
+            gap: 0.7rem;
+          }
+          .tag {
+            color: #34d399;
+          }
+          .attr {
+            color: #93c5fd;
+          }
+          .val {
+            color: #fbbf24;
+          }
+          .comment {
+            color: #6b7280;
+          }
+        </style>
+      </head>
+      <body>
+        <main class="shell">
+          <header class="shell-header">
+            <div class="shell-dots">
+              <span class="dot"></span>
+              <span class="dot"></span>
+              <span class="dot"></span>
+            </div>
+            <div class="shell-title">Tines · Terraform · Ansible</div>
+          </header>
+          <section class="shell-body">
+            <div>
+              <div class="pill">
+                <span class="pill-dot"></span>
+                Live environment ready
+              </div>
+              <h1 class="headline">
+                Hello from <span>Tines + Terraform + Ansible</span>
+              </h1>
+              <p class="subheadline">
+                This server was provisioned by Terraform, configured by Ansible,
+                and is now ready to host your next workflow or web application.
+              </p>
+              <div class="badge-row">
+                <span class="badge">Automated provision</span>
+                <span class="badge">Idempotent deploys</span>
+                <span class="badge">Cloud-native</span>
+              </div>
+              <div class="cta-row">
+                <button class="btn-primary">
+                  Connected successfully
+                </button>
+                <span class="hint">
+                  This page was generated automatically by your demo workflow.
+                </span>
+              </div>
+            </div>
+            <aside class="side-panel">
+              <div class="comment"># Request snapshot</div>
+              <div>&lt;<span class="tag">request</span>
+                <span class="attr">source</span>=<span class="val">"tines"</span>
+                <span class="attr">orchestrator</span>=<span class="val">"terraform"</span>&gt;</div>
+              <div class="comment"># Response from this server</div>
+              <div>&lt;<span class="tag">response</span>
+                <span class="attr">status</span>=<span class="val">"200"</span>
+                <span class="attr">service</span>=<span class="val">"nginx"</span>&gt;</div>
+              <div>  &lt;<span class="tag">message</span>&gt;Hello from your automated lab&lt;/<span class="tag">message</span>&gt;</div>
+              <div>&lt;/<span class="tag">response</span>&gt;</div>
+            </aside>
+          </section>
+        </main>
+      </body>
+      </html>
+
   tasks:
-    - name: Install nginx on Amazon/RedHat
+    - name: Install nginx on Amazon Linux / RedHat
       yum:
         name: nginx
         state: present
@@ -14,20 +250,20 @@
         update_cache: yes
       when: ansible_os_family == "Debian"
 
-    - name: Start nginx
+    - name: Ensure nginx is started and enabled
       service:
         name: nginx
         state: started
         enabled: yes
 
-    - name: Create hello world page on Amazon/RedHat
+    - name: Deploy landing page on Amazon Linux / RedHat
       copy:
         dest: /usr/share/nginx/html/index.html
-        content: "<h1>Hello from Tines + Terraform + Ansible!</h1>"
+        content: "{{ landing_page_html }}"
       when: ansible_os_family == "RedHat"
 
-    - name: Create hello world page on Debian/Ubuntu
+    - name: Deploy landing page on Debian/Ubuntu
       copy:
         dest: /var/www/html/index.html
-        content: "<h1>Hello from Tines + Terraform + Ansible!</h1>"
+        content: "{{ landing_page_html }}"
       when: ansible_os_family == "Debian"
