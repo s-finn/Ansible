@@ -3,6 +3,60 @@
   gather_facts: yes
 
   vars:
+    ssl_cert_dir: /etc/nginx/ssl
+    ssl_cert: /etc/nginx/ssl/server.crt
+    ssl_key: /etc/nginx/ssl/server.key
+
+    nginx_ssl_conf_redhat: |
+      server {
+          listen 80;
+          server_name _;
+          return 301 https://$host$request_uri;
+      }
+
+      server {
+          listen 443 ssl;
+          server_name _;
+
+          ssl_certificate     /etc/nginx/ssl/server.crt;
+          ssl_certificate_key /etc/nginx/ssl/server.key;
+
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_ciphers         HIGH:!aNULL:!MD5;
+
+          root  /usr/share/nginx/html;
+          index index.html;
+
+          location / {
+              try_files $uri $uri/ =404;
+          }
+      }
+
+    nginx_ssl_conf_debian: |
+      server {
+          listen 80;
+          server_name _;
+          return 301 https://$host$request_uri;
+      }
+
+      server {
+          listen 443 ssl;
+          server_name _;
+
+          ssl_certificate     /etc/nginx/ssl/server.crt;
+          ssl_certificate_key /etc/nginx/ssl/server.key;
+
+          ssl_protocols       TLSv1.2 TLSv1.3;
+          ssl_ciphers         HIGH:!aNULL:!MD5;
+
+          root  /var/www/html;
+          index index.html;
+
+          location / {
+              try_files $uri $uri/ =404;
+          }
+      }
+
     landing_page_html: |
       <!DOCTYPE html>
       <html lang="en">
@@ -237,18 +291,83 @@
       </html>
 
   tasks:
-    - name: Install nginx on Amazon Linux / RedHat
+    # ── Package installation ────────────────────────────────────────────────
+
+    - name: Install nginx and openssl on Amazon Linux / RedHat
       yum:
-        name: nginx
+        name:
+          - nginx
+          - openssl
         state: present
       when: ansible_os_family == "RedHat"
 
-    - name: Install nginx on Debian/Ubuntu
+    - name: Install nginx and openssl on Debian/Ubuntu
       apt:
-        name: nginx
+        name:
+          - nginx
+          - openssl
         state: present
         update_cache: yes
       when: ansible_os_family == "Debian"
+
+    # ── TLS certificate ─────────────────────────────────────────────────────
+
+    - name: Create SSL certificate directory
+      file:
+        path: "{{ ssl_cert_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Generate self-signed SSL certificate (valid 365 days)
+      command: >
+        openssl req -x509 -nodes -days 365
+        -newkey rsa:2048
+        -keyout {{ ssl_key }}
+        -out {{ ssl_cert }}
+        -subj "/C=US/ST=State/L=City/O=Org/CN=localhost"
+      args:
+        creates: "{{ ssl_cert }}"   # idempotent – skip if cert already exists
+
+    - name: Restrict SSL key permissions
+      file:
+        path: "{{ ssl_key }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    # ── Nginx HTTPS configuration ────────────────────────────────────────────
+
+    - name: Deploy nginx SSL config on Amazon Linux / RedHat
+      copy:
+        dest: /etc/nginx/conf.d/ssl.conf
+        content: "{{ nginx_ssl_conf_redhat }}"
+      notify: Reload nginx
+      when: ansible_os_family == "RedHat"
+
+    - name: Remove default nginx site on Debian/Ubuntu
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      when: ansible_os_family == "Debian"
+
+    - name: Deploy nginx SSL config on Debian/Ubuntu
+      copy:
+        dest: /etc/nginx/sites-available/ssl.conf
+        content: "{{ nginx_ssl_conf_debian }}"
+      notify: Reload nginx
+      when: ansible_os_family == "Debian"
+
+    - name: Enable SSL site on Debian/Ubuntu
+      file:
+        src: /etc/nginx/sites-available/ssl.conf
+        dest: /etc/nginx/sites-enabled/ssl.conf
+        state: link
+      notify: Reload nginx
+      when: ansible_os_family == "Debian"
+
+    # ── Landing page ─────────────────────────────────────────────────────────
 
     - name: Ensure nginx is started and enabled
       service:
@@ -267,3 +386,11 @@
         dest: /var/www/html/index.html
         content: "{{ landing_page_html }}"
       when: ansible_os_family == "Debian"
+
+  # ── Handlers ───────────────────────────────────────────────────────────────
+
+  handlers:
+    - name: Reload nginx
+      service:
+        name: nginx
+        state: reloaded
